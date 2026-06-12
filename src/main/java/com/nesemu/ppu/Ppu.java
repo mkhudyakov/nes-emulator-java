@@ -404,6 +404,14 @@ public final class Ppu {
             if (cycle == 340 && scanline >= -1) {
                 loadSpriteShifters();
             }
+
+            // Drive the MMC3-style scanline IRQ counter. On hardware this is
+            // clocked by PPU address line A12 toggling during the fetch pipeline;
+            // clocking once per rendered scanline (here, after the visible dots)
+            // is accurate enough for the split-screen IRQs games rely on.
+            if (cycle == 260 && renderingEnabled() && cartridge != null) {
+                cartridge.clockScanlineCounter();
+            }
         }
 
         if (scanline == 240) {

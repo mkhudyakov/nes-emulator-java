@@ -2,6 +2,7 @@ package com.nesemu.cartridge;
 
 import com.nesemu.mapper.Mapper;
 import com.nesemu.mapper.Mapper0;
+import com.nesemu.mapper.Mapper4;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -75,9 +76,15 @@ public final class Cartridge {
                     header.getChrRomBanks(),
                     chrIsRam,
                     header.getMirroring());
+            case 4 -> new Mapper4(prgRom, chrMem,
+                    header.getPrgRomBanks(),
+                    header.getChrRomBanks(),
+                    chrIsRam,
+                    header.getMirroring(),
+                    header.isFourScreen());
             default -> throw new InvalidRomException(
                     "Unsupported mapper: " + id + ". This emulator currently only supports "
-                            + "Mapper 0 (NROM).");
+                            + "Mapper 0 (NROM) and Mapper 4 (MMC3).");
         };
     }
 
@@ -116,5 +123,17 @@ public final class Cartridge {
 
     public void reset() {
         mapper.reset();
+    }
+
+    // --- Mapper IRQ (MMC3 scanline counter) -------------------------------
+
+    /** Clock the mapper's scanline IRQ counter; called once per rendered scanline. */
+    public void clockScanlineCounter() {
+        mapper.clockScanlineCounter();
+    }
+
+    /** True while the mapper is asserting the CPU IRQ line. */
+    public boolean isMapperIrqAsserted() {
+        return mapper.isIrqAsserted();
     }
 }

@@ -145,6 +145,10 @@ public final class NesSystem implements Bus {
             if (apu.isIrqAsserted()) {
                 cpu.irq();
             }
+            // The mapper (e.g. MMC3's scanline counter) shares the IRQ line.
+            if (cartridge != null && cartridge.isMapperIrqAsserted()) {
+                cpu.irq();
+            }
         }
 
         // The PPU may raise an NMI at the start of VBlank.

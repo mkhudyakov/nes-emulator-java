@@ -62,4 +62,23 @@ public abstract class Mapper {
     public void reset() {
         // no-op by default
     }
+
+    /**
+     * Clock a scanline-based IRQ counter. The PPU calls this once per rendered
+     * scanline (while rendering is enabled) so mappers such as MMC3 can produce
+     * the timed IRQ that games use for split-screen effects. Default is a no-op.
+     */
+    public void clockScanlineCounter() {
+        // no-op by default
+    }
+
+    /** True while this mapper is pulling the CPU IRQ line low. Default: never. */
+    public boolean isIrqAsserted() {
+        return false;
+    }
+
+    /** Acknowledge / release the mapper IRQ line. Default is a no-op. */
+    public void clearIrq() {
+        // no-op by default
+    }
 }

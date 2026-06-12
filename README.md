@@ -84,7 +84,8 @@ com.nesemu
 │   └── InvalidRomException
 ├── mapper
 │   ├── Mapper           Abstract mapper interface.
-│   └── Mapper0          NROM: the layout Super Mario Bros. uses.
+│   ├── Mapper0          NROM: the layout Super Mario Bros. uses.
+│   └── Mapper4          MMC3: PRG/CHR banking + scanline IRQ (SMB3, Mega Man 3-6).
 ├── controller
 │   └── Controller       Standard pad with the 8-bit shift register.
 └── ui
@@ -128,6 +129,8 @@ JUnit 5 tests live under `src/test/java` and cover:
   wraparound, branch taken, `JSR`/`RTS`.
 - **Mapper 0** — 16 KB PRG mirroring vs. 32 KB, PRG RAM, CHR RAM, address
   decoding.
+- **Mapper 4 (MMC3)** — PRG bank modes, fixed last-two banks, 2 KB/1 KB CHR
+  banking, A12 inversion, mirroring register, and the scanline IRQ counter.
 - **Controller** — shift-register read order, post-eight reads returning 1,
   strobe-high reloading.
 - **APU** — resampling rate, pulse/triangle producing audible output, disabled
@@ -138,11 +141,12 @@ Run them with `gradle test`.
 ## Scope
 
 **Implemented:** CPU (official opcodes), PPU (background + sprites), APU (all five
-channels with audio output), NROM, controller input, Swing display, iNES loading.
+channels with audio output), NROM (Mapper 0), MMC3 (Mapper 4, with its scanline
+IRQ), controller input, Swing display, iNES loading.
 
 **Out of scope (by design):** save states, rewind, netplay, cycle-perfect CPU
-accuracy, and mappers other than 0. Loading a non-NROM ROM raises a clear error
-dialog.
+accuracy, and mappers other than 0 and 4. Loading an unsupported mapper raises a
+clear error dialog.
 
 ## License / legal
 

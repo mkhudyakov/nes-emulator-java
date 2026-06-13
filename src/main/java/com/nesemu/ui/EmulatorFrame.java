@@ -31,6 +31,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JViewport;
 import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
 import javax.swing.ScrollPaneConstants;
@@ -66,6 +67,14 @@ public final class EmulatorFrame extends JFrame {
 
     /** The on-screen ROM picker, when shown; null once a ROM is chosen. */
     private Component romChooser;
+
+    /**
+     * The focusable {@link JList} inside {@link #romChooser} (the panel itself is
+     * not focusable, and only the list carries the arrow-key listener); null when
+     * no chooser is shown. Tracked so focus can be restored to it after the
+     * fullscreen toggle disposes and recreates the window.
+     */
+    private JList<Path> romList;
 
     public EmulatorFrame() {
         super("NES Emulator");
@@ -213,10 +222,13 @@ public final class EmulatorFrame extends JFrame {
             setVisible(true);
             fullscreen = false;
         }
-        if (romChooser != null) {
-            romChooser.requestFocusInWindow();
-        } else {
-            screen.requestFocusInWindow();
+        // Restore keyboard focus to the active view. The dispose/recreate above
+        // drops focus, and the chooser's key handling lives on the JList (not the
+        // panel), so focus the list directly. Defer until the recreated window is
+        // realized, otherwise requestFocusInWindow is a no-op.
+        Component focusTarget = (romChooser != null) ? romList : screen;
+        if (focusTarget != null) {
+            SwingUtilities.invokeLater(focusTarget::requestFocusInWindow);
         }
     }
 
@@ -236,6 +248,7 @@ public final class EmulatorFrame extends JFrame {
         roms.forEach(model::addElement);
 
         JList<Path> list = new JList<>(model);
+        romList = list;
         list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         list.setSelectedIndex(0);
         list.setBackground(Color.BLACK);
@@ -282,6 +295,11 @@ public final class EmulatorFrame extends JFrame {
                 ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getViewport().setBackground(Color.BLACK);
+        // Avoid JViewport's default BLIT_SCROLL_MODE: it scrolls via
+        // Graphics.copyArea, which is effectively unaccelerated on macOS and
+        // crawls on a full-screen Retina surface. SIMPLE_SCROLL_MODE never calls
+        // copyArea — it just repaints the (few) visible cells.
+        scroll.getViewport().setScrollMode(JViewport.SIMPLE_SCROLL_MODE);
 
         JLabel title = new JLabel("Select a game  —  ↑/↓ and Enter");
         title.setForeground(Color.WHITE);
@@ -310,6 +328,7 @@ public final class EmulatorFrame extends JFrame {
         }
         remove(romChooser);
         romChooser = null;
+        romList = null;
         add(screen, BorderLayout.CENTER);
         revalidate();
         repaint();
@@ -347,36 +366,14 @@ public final class EmulatorFrame extends JFrame {
 
     private void emulationLoop() {
         long nextFrame = System.nanoTime();
-        // --- temporary perf instrumentation ---
-        long winStart = System.nanoTime();
-        long stepAcc = 0, paintAcc = 0, audioAcc = 0;
-        int frames = 0;
         while (running) {
-            long t0 = System.nanoTime();
             nes.stepFrame();
-            long t1 = System.nanoTime();
             screen.updateFrame(nes.getFramebuffer());
-            long t2 = System.nanoTime();
 
             // Push this frame's audio. When the sound line is active its buffer
             // blocks here as needed, pacing emulation to real time.
             int produced = nes.getApu().drainSamples(sampleBuffer);
             audio.write(sampleBuffer, produced);
-            long t3 = System.nanoTime();
-
-            stepAcc += t1 - t0;
-            paintAcc += t2 - t1;
-            audioAcc += t3 - t2;
-            frames++;
-            if (t3 - winStart >= 1_000_000_000L) {
-                System.out.printf(
-                        "[perf] fps=%d  step=%.1fms  updateFrame=%.2fms  audioWrite=%.2fms%n",
-                        frames, stepAcc / 1e6 / frames, paintAcc / 1e6 / frames,
-                        audioAcc / 1e6 / frames);
-                winStart = t3;
-                stepAcc = paintAcc = audioAcc = 0;
-                frames = 0;
-            }
 
 //            if (audio.isAvailable()) {
 //                // Audio provides the timing; just yield to stay responsive.

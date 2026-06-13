@@ -57,14 +57,8 @@ public final class ScreenPanel extends JPanel {
         repaint();
     }
 
-    // --- temporary perf instrumentation ---
-    private long paintWinStart = System.nanoTime();
-    private long paintAcc = 0;
-    private int paintCount = 0;
-
     @Override
     protected void paintComponent(Graphics g) {
-        long pt0 = System.nanoTime();
         super.paintComponent(g);
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
@@ -89,18 +83,6 @@ public final class ScreenPanel extends JPanel {
             g2.drawImage(scaleSource, x, y, drawW, drawH, null);
         } else {
             g2.drawImage(source, x, y, drawW, drawH, null);
-        }
-
-        // --- temporary perf instrumentation ---
-        long pt1 = System.nanoTime();
-        paintAcc += pt1 - pt0;
-        paintCount++;
-        if (pt1 - paintWinStart >= 1_000_000_000L) {
-            System.out.printf("[perf] paints/s=%d  paint=%.2fms  size=%dx%d%n",
-                    paintCount, paintAcc / 1e6 / paintCount, panelW, panelH);
-            paintWinStart = pt1;
-            paintAcc = 0;
-            paintCount = 0;
         }
     }
 

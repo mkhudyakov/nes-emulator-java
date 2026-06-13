@@ -210,10 +210,16 @@ public final class EmulatorFrame extends JFrame {
             setUndecorated(true);
             getJMenuBar().setVisible(false);
             setBounds(device.getDefaultConfiguration().getBounds());
+            // Always-on-top so the borderless window stacks above the desktop
+            // panel/taskbar (e.g. the Raspberry Pi menu bar); an undecorated
+            // window alone does not cover it under most Linux window managers.
+            setAlwaysOnTop(true);
             setVisible(true);
+            toFront();
             fullscreen = true;
         } else {
             dispose();
+            setAlwaysOnTop(false);
             setUndecorated(false);
             getJMenuBar().setVisible(true);
             if (windowedBounds != null) {

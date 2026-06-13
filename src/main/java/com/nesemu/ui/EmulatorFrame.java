@@ -172,11 +172,17 @@ public final class EmulatorFrame extends JFrame {
     }
 
     /**
-     * Switch between windowed and real fullscreen. Uses the platform's
-     * full-screen exclusive mode so the NES picture (scaled and letterboxed by
-     * {@link ScreenPanel}) fills the entire display. The window must be
-     * undecorated to enter exclusive mode, so we dispose and recreate the native
-     * peer around the switch; the menu bar is hidden while fullscreen.
+     * Switch between windowed and fullscreen. Uses a borderless ("fake")
+     * fullscreen window — an undecorated frame sized to fill the display —
+     * rather than the platform's full-screen <em>exclusive</em> mode.
+     *
+     * <p>Exclusive mode ({@code setFullScreenWindow}) disables Java2D's normal
+     * hardware-accelerated blit for passive Swing repaints, so the per-frame
+     * upscale done in {@link ScreenPanel#paintComponent} falls back to slow
+     * software rendering (badly so on macOS), dragging the whole emulation down
+     * via back-pressure. A borderless window keeps the accelerated pipeline that
+     * already performs well when windowed; it just scales to a larger surface.
+     * The menu bar is hidden while fullscreen.
      */
     /** Enter fullscreen if not already in it (e.g. from a startup flag). */
     public void enterFullscreen() {
@@ -185,22 +191,25 @@ public final class EmulatorFrame extends JFrame {
         }
     }
 
+    private java.awt.Rectangle windowedBounds;
+
     private void toggleFullscreen() {
         GraphicsDevice device = getGraphicsConfiguration().getDevice();
         if (!fullscreen) {
-            if (!device.isFullScreenSupported()) {
-                return;
-            }
+            windowedBounds = getBounds();
             dispose();
             setUndecorated(true);
             getJMenuBar().setVisible(false);
-            device.setFullScreenWindow(this);
+            setBounds(device.getDefaultConfiguration().getBounds());
+            setVisible(true);
             fullscreen = true;
         } else {
-            device.setFullScreenWindow(null);
             dispose();
             setUndecorated(false);
             getJMenuBar().setVisible(true);
+            if (windowedBounds != null) {
+                setBounds(windowedBounds);
+            }
             setVisible(true);
             fullscreen = false;
         }
@@ -338,14 +347,36 @@ public final class EmulatorFrame extends JFrame {
 
     private void emulationLoop() {
         long nextFrame = System.nanoTime();
+        // --- temporary perf instrumentation ---
+        long winStart = System.nanoTime();
+        long stepAcc = 0, paintAcc = 0, audioAcc = 0;
+        int frames = 0;
         while (running) {
+            long t0 = System.nanoTime();
             nes.stepFrame();
+            long t1 = System.nanoTime();
             screen.updateFrame(nes.getFramebuffer());
+            long t2 = System.nanoTime();
 
             // Push this frame's audio. When the sound line is active its buffer
             // blocks here as needed, pacing emulation to real time.
             int produced = nes.getApu().drainSamples(sampleBuffer);
             audio.write(sampleBuffer, produced);
+            long t3 = System.nanoTime();
+
+            stepAcc += t1 - t0;
+            paintAcc += t2 - t1;
+            audioAcc += t3 - t2;
+            frames++;
+            if (t3 - winStart >= 1_000_000_000L) {
+                System.out.printf(
+                        "[perf] fps=%d  step=%.1fms  updateFrame=%.2fms  audioWrite=%.2fms%n",
+                        frames, stepAcc / 1e6 / frames, paintAcc / 1e6 / frames,
+                        audioAcc / 1e6 / frames);
+                winStart = t3;
+                stepAcc = paintAcc = audioAcc = 0;
+                frames = 0;
+            }
 
 //            if (audio.isAvailable()) {
 //                // Audio provides the timing; just yield to stay responsive.

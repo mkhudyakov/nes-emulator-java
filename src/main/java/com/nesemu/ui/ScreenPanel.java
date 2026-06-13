@@ -21,8 +21,11 @@ public final class ScreenPanel extends JPanel {
     public static final int NES_WIDTH = 256;
     public static final int NES_HEIGHT = 240;
 
+    // TYPE_INT_RGB (not ARGB): the NES output is fully opaque, so dropping the
+    // alpha channel lets Java2D blit/scale without per-pixel alpha compositing —
+    // a meaningful saving on weak GPUs (e.g. Raspberry Pi) when scaled up.
     private final BufferedImage image =
-            new BufferedImage(NES_WIDTH, NES_HEIGHT, BufferedImage.TYPE_INT_ARGB);
+            new BufferedImage(NES_WIDTH, NES_HEIGHT, BufferedImage.TYPE_INT_RGB);
     private final int[] imageData =
             ((java.awt.image.DataBufferInt) image.getRaster().getDataBuffer()).getData();
 

@@ -36,7 +36,7 @@ If you have Gradle installed:
 
 ```bash
 gradle run                            # opens the window
-gradle run --args="path/to/game.nes"  # boots straight into a ROM
+gradle run --args="--fullscreen /Users/claude/Downloads/mario.nes" 
 gradle test                           # run the JUnit test suite
 gradle build                          # compile + test + assemble
 ```

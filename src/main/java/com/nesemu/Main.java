@@ -10,9 +10,13 @@ import javax.swing.UIManager;
  * and, if a ROM path is supplied on the command line, loads it immediately.
  *
  * <pre>
- *   ./gradlew run                       # open the window, then File > Open ROM…
- *   ./gradlew run --args="smb.nes"      # boot straight into a ROM
+ *   ./gradlew run                                   # open the window, then File > Open ROM…
+ *   ./gradlew run --args="smb.nes"                  # boot straight into a ROM
+ *   ./gradlew run --args="--fullscreen smb.nes"     # boot into a ROM, fullscreen
  * </pre>
+ *
+ * Accepts an optional {@code --fullscreen} (or {@code -f}) flag to start in
+ * fullscreen; the first non-flag argument is treated as the ROM path.
  */
 public final class Main {
 
@@ -26,11 +30,26 @@ public final class Main {
             // Fall back to the default look and feel.
         }
 
+        boolean fullscreen = false;
+        String romPath = null;
+        for (String arg : args) {
+            if (arg.equals("--fullscreen") || arg.equals("-f")) {
+                fullscreen = true;
+            } else if (romPath == null) {
+                romPath = arg;
+            }
+        }
+
+        boolean startFullscreen = fullscreen;
+        String rom = romPath;
         SwingUtilities.invokeLater(() -> {
             EmulatorFrame frame = new EmulatorFrame();
             frame.setVisible(true);
-            if (args.length > 0) {
-                frame.loadRom(Path.of(args[0]));
+            if (rom != null) {
+                frame.loadRom(Path.of(rom));
+            }
+            if (startFullscreen) {
+                frame.enterFullscreen();
             }
         });
     }

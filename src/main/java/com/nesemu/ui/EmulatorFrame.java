@@ -6,6 +6,7 @@ import com.nesemu.cartridge.Cartridge;
 import com.nesemu.cartridge.InvalidRomException;
 import com.nesemu.controller.Controller;
 import java.awt.BorderLayout;
+import java.awt.GraphicsDevice;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.io.IOException;
@@ -17,6 +18,7 @@ import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.KeyStroke;
 import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
@@ -44,6 +46,7 @@ public final class EmulatorFrame extends JFrame {
 
     private volatile boolean running = false;
     private volatile boolean romLoaded = false;
+    private boolean fullscreen = false;
     private Thread emulationThread;
 
     public EmulatorFrame() {
@@ -81,6 +84,12 @@ public final class EmulatorFrame extends JFrame {
         emuMenu.add(reset);
         emuMenu.add(pause);
 
+        JMenu viewMenu = new JMenu("View");
+        JMenuItem fullscreen = new JMenuItem("Toggle Fullscreen");
+        fullscreen.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F11, 0));
+        fullscreen.addActionListener(e -> toggleFullscreen());
+        viewMenu.add(fullscreen);
+
         JMenu helpMenu = new JMenu("Help");
         JMenuItem controls = new JMenuItem("Controls");
         controls.addActionListener(e -> showControls());
@@ -88,6 +97,7 @@ public final class EmulatorFrame extends JFrame {
 
         bar.add(fileMenu);
         bar.add(emuMenu);
+        bar.add(viewMenu);
         bar.add(helpMenu);
         return bar;
     }
@@ -141,6 +151,42 @@ public final class EmulatorFrame extends JFrame {
         } else {
             startEmulation();
         }
+    }
+
+    /**
+     * Switch between windowed and real fullscreen. Uses the platform's
+     * full-screen exclusive mode so the NES picture (scaled and letterboxed by
+     * {@link ScreenPanel}) fills the entire display. The window must be
+     * undecorated to enter exclusive mode, so we dispose and recreate the native
+     * peer around the switch; the menu bar is hidden while fullscreen.
+     */
+    /** Enter fullscreen if not already in it (e.g. from a startup flag). */
+    public void enterFullscreen() {
+        if (!fullscreen) {
+            toggleFullscreen();
+        }
+    }
+
+    private void toggleFullscreen() {
+        GraphicsDevice device = getGraphicsConfiguration().getDevice();
+        if (!fullscreen) {
+            if (!device.isFullScreenSupported()) {
+                return;
+            }
+            dispose();
+            setUndecorated(true);
+            getJMenuBar().setVisible(false);
+            device.setFullScreenWindow(this);
+            fullscreen = true;
+        } else {
+            device.setFullScreenWindow(null);
+            dispose();
+            setUndecorated(false);
+            getJMenuBar().setVisible(true);
+            setVisible(true);
+            fullscreen = false;
+        }
+        screen.requestFocusInWindow();
     }
 
     // ------------------------------------------------------------------
@@ -211,6 +257,14 @@ public final class EmulatorFrame extends JFrame {
         KeyAdapter adapter = new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_F11) {
+                    toggleFullscreen();
+                    return;
+                }
+                if (e.getKeyCode() == KeyEvent.VK_ESCAPE && fullscreen) {
+                    toggleFullscreen();
+                    return;
+                }
                 setButton(e, true);
             }
 

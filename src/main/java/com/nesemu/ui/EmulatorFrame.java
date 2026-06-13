@@ -228,24 +228,24 @@ public final class EmulatorFrame extends JFrame {
             int produced = nes.getApu().drainSamples(sampleBuffer);
             audio.write(sampleBuffer, produced);
 
-            if (audio.isAvailable()) {
-                // Audio provides the timing; just yield to stay responsive.
-                nextFrame = System.nanoTime();
-            } else {
-                // No sound: fall back to a sleep-based 60 fps clock.
-                nextFrame += FRAME_NANOS;
-                long sleep = nextFrame - System.nanoTime();
-                if (sleep > 0) {
-                    try {
-                        Thread.sleep(sleep / 1_000_000L, (int) (sleep % 1_000_000L));
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        return;
-                    }
-                } else {
-                    nextFrame = System.nanoTime();
-                }
-            }
+//            if (audio.isAvailable()) {
+//                // Audio provides the timing; just yield to stay responsive.
+//                nextFrame = System.nanoTime();
+//            } else {
+//                // No sound: fall back to a sleep-based 60 fps clock.
+//                nextFrame += FRAME_NANOS;
+//                long sleep = nextFrame - System.nanoTime();
+//                if (sleep > 0) {
+//                    try {
+//                        Thread.sleep(sleep / 1_000_000L, (int) (sleep % 1_000_000L));
+//                    } catch (InterruptedException e) {
+//                        Thread.currentThread().interrupt();
+//                        return;
+//                    }
+//                } else {
+//                    nextFrame = System.nanoTime();
+//                }
+//            }
         }
     }
 

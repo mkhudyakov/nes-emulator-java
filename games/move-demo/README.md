@@ -7,6 +7,10 @@ as a clean starting point you can read top-to-bottom.
 
 All graphics and code are original (MIT-licensed, see repository root).
 
+> **New to NES programming?** [`TUTORIAL.md`](TUTORIAL.md) explains everything in
+> this project from first principles — the hardware, the 6502, the assembler,
+> and every part of the code — with line references you can follow along.
+
 ## Controls
 
 | Button | Action |

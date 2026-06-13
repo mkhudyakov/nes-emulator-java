@@ -6,19 +6,34 @@ import com.nesemu.cartridge.Cartridge;
 import com.nesemu.cartridge.InvalidRomException;
 import com.nesemu.controller.Controller;
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Font;
 import java.awt.GraphicsDevice;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.IOException;
 import java.io.File;
 import java.nio.file.Path;
+import java.util.List;
+import javax.swing.BorderFactory;
+import javax.swing.DefaultListCellRenderer;
+import javax.swing.DefaultListModel;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.KeyStroke;
+import javax.swing.ListSelectionModel;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 
@@ -48,6 +63,9 @@ public final class EmulatorFrame extends JFrame {
     private volatile boolean romLoaded = false;
     private boolean fullscreen = false;
     private Thread emulationThread;
+
+    /** The on-screen ROM picker, when shown; null once a ROM is chosen. */
+    private Component romChooser;
 
     public EmulatorFrame() {
         super("NES Emulator");
@@ -186,7 +204,108 @@ public final class EmulatorFrame extends JFrame {
             setVisible(true);
             fullscreen = false;
         }
+        if (romChooser != null) {
+            romChooser.requestFocusInWindow();
+        } else {
+            screen.requestFocusInWindow();
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // ROM chooser
+    // ------------------------------------------------------------------
+
+    /**
+     * Replace the display with an on-screen list of ROMs (black background,
+     * white text). Navigate with the arrow keys and press Enter, or double-click,
+     * to load one. Works in both windowed and fullscreen mode.
+     */
+    public void showRomChooser(List<Path> roms) {
+        stopEmulation();
+
+        DefaultListModel<Path> model = new DefaultListModel<>();
+        roms.forEach(model::addElement);
+
+        JList<Path> list = new JList<>(model);
+        list.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        list.setSelectedIndex(0);
+        list.setBackground(Color.BLACK);
+        list.setForeground(Color.WHITE);
+        list.setSelectionBackground(Color.WHITE);
+        list.setSelectionForeground(Color.BLACK);
+        list.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 24));
+        list.setFixedCellHeight(36);
+        list.setBorder(BorderFactory.createEmptyBorder(8, 24, 8, 24));
+        list.setCellRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> jl, Object value,
+                    int index, boolean selected, boolean focused) {
+                super.getListCellRendererComponent(jl, value, index, selected, focused);
+                setText(((Path) value).getFileName().toString());
+                return this;
+            }
+        });
+
+        // Enter / double-click loads the highlighted ROM.
+        list.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+                    chooseRom(list.getSelectedValue());
+                } else if (e.getKeyCode() == KeyEvent.VK_F11) {
+                    toggleFullscreen();
+                } else if (e.getKeyCode() == KeyEvent.VK_ESCAPE && fullscreen) {
+                    toggleFullscreen();
+                }
+            }
+        });
+        list.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    chooseRom(list.getSelectedValue());
+                }
+            }
+        });
+
+        JScrollPane scroll = new JScrollPane(list,
+                ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED,
+                ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        scroll.getViewport().setBackground(Color.BLACK);
+
+        JLabel title = new JLabel("Select a game  —  ↑/↓ and Enter");
+        title.setForeground(Color.WHITE);
+        title.setFont(new Font(Font.MONOSPACED, Font.BOLD, 22));
+        title.setBorder(BorderFactory.createEmptyBorder(24, 24, 16, 24));
+
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.BLACK);
+        panel.add(title, BorderLayout.NORTH);
+        panel.add(scroll, BorderLayout.CENTER);
+
+        remove(screen);
+        if (romChooser != null) {
+            remove(romChooser);
+        }
+        romChooser = panel;
+        add(panel, BorderLayout.CENTER);
+        revalidate();
+        repaint();
+        list.requestFocusInWindow();
+    }
+
+    private void chooseRom(Path rom) {
+        if (rom == null) {
+            return;
+        }
+        remove(romChooser);
+        romChooser = null;
+        add(screen, BorderLayout.CENTER);
+        revalidate();
+        repaint();
         screen.requestFocusInWindow();
+        loadRom(rom);
     }
 
     // ------------------------------------------------------------------
@@ -253,28 +372,29 @@ public final class EmulatorFrame extends JFrame {
     // Keyboard input
     // ------------------------------------------------------------------
 
-    private void installKeyHandling() {
-        KeyAdapter adapter = new KeyAdapter() {
-            @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_F11) {
-                    toggleFullscreen();
-                    return;
-                }
-                if (e.getKeyCode() == KeyEvent.VK_ESCAPE && fullscreen) {
-                    toggleFullscreen();
-                    return;
-                }
-                setButton(e, true);
+    private final KeyAdapter inputAdapter = new KeyAdapter() {
+        @Override
+        public void keyPressed(KeyEvent e) {
+            if (e.getKeyCode() == KeyEvent.VK_F11) {
+                toggleFullscreen();
+                return;
             }
+            if (e.getKeyCode() == KeyEvent.VK_ESCAPE && fullscreen) {
+                toggleFullscreen();
+                return;
+            }
+            setButton(e, true);
+        }
 
-            @Override
-            public void keyReleased(KeyEvent e) {
-                setButton(e, false);
-            }
-        };
-        addKeyListener(adapter);
-        screen.addKeyListener(adapter);
+        @Override
+        public void keyReleased(KeyEvent e) {
+            setButton(e, false);
+        }
+    };
+
+    private void installKeyHandling() {
+        addKeyListener(inputAdapter);
+        screen.addKeyListener(inputAdapter);
         screen.requestFocusInWindow();
     }
 
